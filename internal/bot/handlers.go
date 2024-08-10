@@ -45,7 +45,7 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 	// Process the command
 	var embed *discordgo.MessageEmbed
 	switch i.ApplicationCommandData().Name {
-	case "ping":
+	case "sping":
 		embed = b.handlePing(s, i)
 	case "setperm":
 		embed = b.pc.HandleSetPerm(s, i)

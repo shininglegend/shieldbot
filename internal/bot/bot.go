@@ -60,7 +60,7 @@ func (b *Bot) Stop() {
 func (b *Bot) registerCommands() error {
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name:        "ping",
+			Name:        "sping",
 			Description: "Responds with Pong!",
 		},
 		{
