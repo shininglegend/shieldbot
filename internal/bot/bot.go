@@ -5,11 +5,16 @@ import (
 	"database/sql"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/google/martian/v3/log"
+	"github.com/shininglegend/shieldbot/internal/commands"
+	"github.com/shininglegend/shieldbot/internal/permissions"
 )
 
 type Bot struct {
 	session *discordgo.Session
 	db      *sql.DB
+	pm      *permissions.PermissionManager
+	pc      *commands.PermissionCommands
 }
 
 func New(token string, db *sql.DB) (*Bot, error) {
@@ -18,9 +23,19 @@ func New(token string, db *sql.DB) (*Bot, error) {
 		return nil, err
 	}
 
+	pm := permissions.NewPermissionManager(db)
+	err = pm.SetupTables()
+	if err != nil {
+		return nil, err
+	}
+
+	pc := commands.NewPermissionCommands(pm)
+
 	bot := &Bot{
 		session: session,
 		db:      db,
+		pm:      pm,
+		pc:      pc,
 	}
 
 	session.AddHandler(bot.handleCommands)
@@ -33,6 +48,9 @@ func (b *Bot) Start() error {
 	if err != nil {
 		return err
 	}
+	log.Infof("Bot is running as %s", b.session.State.User.Username)
+
+	b.pc.RegisterCommands(b.session)
 
 	return b.registerCommands()
 }

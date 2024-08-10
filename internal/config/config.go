@@ -4,8 +4,8 @@ package config
 import "github.com/spf13/viper"
 
 type Config struct {
-	Token       string
-	DatabaseURL string
+	Token        string
+	DatabasePath string
 }
 
 func Load() (*Config, error) {
@@ -17,8 +17,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// In the Load function:
 	return &Config{
-		Token:       viper.GetString("token"),
-		DatabaseURL: viper.GetString("database_url"),
+		Token:        viper.GetString("token"),
+		DatabasePath: viper.GetString("database_path"),
 	}, nil
 }

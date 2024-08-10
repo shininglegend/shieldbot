@@ -23,4 +23,8 @@ go.work.sum
 
 # env file
 .env
+
+# My own files
 config.yaml
+data/*
+cmd/bot/__*

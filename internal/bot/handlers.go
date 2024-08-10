@@ -4,118 +4,75 @@ package bot
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/shininglegend/shieldbot/pkg/utils"
 )
 
 func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.Type != discordgo.InteractionApplicationCommand {
+	// Acknowledge the interaction immediately
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+	if err != nil {
+		log.Printf("Error acknowledging interaction: %v", err)
 		return
 	}
 
+	// Check if user is admin
+	isAdmin, err := b.pm.IsAdmin(s, i.GuildID, i.Member.User.ID)
+	if err != nil {
+		log.Printf("Error checking admin status: %v", err)
+		b.editResponseEmbed(s, i, utils.CreateErrorEmbed("An error occurred while checking permissions."))
+		return
+	}
+
+	// If not admin, check regular permissions
+	if !isAdmin {
+		canUse, err := b.pm.CanUseCommand(i.GuildID, i.Member.User.ID, i.ApplicationCommandData().Name)
+		if err != nil {
+			log.Printf("Error checking permissions: %v", err)
+			b.editResponseEmbed(s, i, utils.CreateErrorEmbed("An error occurred while checking permissions."))
+			return
+		}
+		// Admin bypass
+		if !canUse {
+			b.editResponseEmbed(s, i, utils.CreateErrorEmbed("You don't have permission to use this command."))
+			return
+		}
+	}
+
+	// Process the command
+	var embed *discordgo.MessageEmbed
 	switch i.ApplicationCommandData().Name {
 	case "ping":
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Pong!",
-			},
-		})
+		embed = b.handlePing(s, i)
+	case "setperm":
+		embed = b.pc.HandleSetPerm(s, i)
+	case "setisolationrole":
+		embed = b.pc.HandleSetIsolationRole(s, i)
 	case "isolate":
-		b.handleIsolate(s, i)
+		embed = b.handleIsolate(s, i)
 	case "restore":
-		b.handleRestore(s, i)
+		embed = b.handleRestore(s, i)
+	default:
+		embed = utils.CreateErrorEmbed("Unknown command")
+	}
+
+	// Edit the original response with the command output
+	b.editResponseEmbed(s, i, embed)
+}
+
+func (b *Bot) editResponseEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embed *discordgo.MessageEmbed) {
+	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Embeds: &[]*discordgo.MessageEmbed{embed},
+	})
+	if err != nil {
+		log.Printf("Error editing interaction response: %v", err)
 	}
 }
 
-func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	options := i.ApplicationCommandData().Options
-	user := options[0].UserValue(s)
-
-	member, err := s.GuildMember(i.GuildID, user.ID)
-	if err != nil {
-		log.Printf("Error fetching member: %v", err)
-		respondWithError(s, i, "Failed to fetch member")
-		return
-	}
-
-	// Save current roles
-	roleIDs := strings.Join(member.Roles, ",")
-	_, err = b.db.Exec("INSERT INTO user_roles (user_id, guild_id, roles) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE roles = ?",
-		user.ID, i.GuildID, roleIDs, roleIDs)
-	if err != nil {
-		log.Printf("Error saving roles: %v", err)
-		respondWithError(s, i, "Failed to save roles")
-		return
-	}
-
-	// Remove all roles
-	for _, roleID := range member.Roles {
-		err = s.GuildMemberRoleRemove(i.GuildID, user.ID, roleID)
-		if err != nil {
-			log.Printf("Error removing role: %v", err)
-		}
-	}
-
-	// Add isolation role (assuming you have created this role and have its ID)
-	isolationRoleID := "YOUR_ISOLATION_ROLE_ID"
-	err = s.GuildMemberRoleAdd(i.GuildID, user.ID, isolationRoleID)
-	if err != nil {
-		log.Printf("Error adding isolation role: %v", err)
-		respondWithError(s, i, "Failed to add isolation role")
-		return
-	}
-
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: fmt.Sprintf("User %s has been isolated.", user.Username),
-		},
-	})
-}
-
-func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	options := i.ApplicationCommandData().Options
-	user := options[0].UserValue(s)
-
-	var roleIDs string
-	err := b.db.QueryRow("SELECT roles FROM user_roles WHERE user_id = ? AND guild_id = ?", user.ID, i.GuildID).Scan(&roleIDs)
-	if err != nil {
-		log.Printf("Error fetching roles: %v", err)
-		respondWithError(s, i, "Failed to fetch roles")
-		return
-	}
-
-	// Remove isolation role
-	isolationRoleID := "YOUR_ISOLATION_ROLE_ID"
-	err = s.GuildMemberRoleRemove(i.GuildID, user.ID, isolationRoleID)
-	if err != nil {
-		log.Printf("Error removing isolation role: %v", err)
-	}
-
-	// Restore old roles
-	for _, roleID := range strings.Split(roleIDs, ",") {
-		err = s.GuildMemberRoleAdd(i.GuildID, user.ID, roleID)
-		if err != nil {
-			log.Printf("Error adding role: %v", err)
-		}
-	}
-
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: fmt.Sprintf("Roles for user %s have been restored.", user.Username),
-		},
-	})
-}
-
-func respondWithError(s *discordgo.Session, i *discordgo.InteractionCreate, message string) {
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: message,
-			Flags:   discordgo.MessageFlagsEphemeral,
-		},
-	})
+func (b *Bot) handlePing(s *discordgo.Session, _ *discordgo.InteractionCreate) *discordgo.MessageEmbed {
+	// Return the bot response time in milliseconds
+	return utils.CreateEmbed("Pong!", fmt.Sprintf("%v ms", s.HeartbeatLatency().Milliseconds()))
 }

@@ -1,0 +1,2 @@
+token: "your-bot-token"
+database_path: "./data/main.db"

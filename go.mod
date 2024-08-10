@@ -4,14 +4,12 @@ go 1.22.3
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/google/martian/v3 v3.3.3
+	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/spf13/viper v1.19.0
-	honnef.co/go/tools v0.4.7
 )
 
 require (
-	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -31,7 +29,6 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.13.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

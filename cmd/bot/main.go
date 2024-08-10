@@ -7,8 +7,8 @@ import (
 	"syscall"
 
 	"github.com/shininglegend/shieldbot/internal/bot"
+	"github.com/shininglegend/shieldbot/internal/config"
 	"github.com/shininglegend/shieldbot/internal/database"
-	"honnef.co/go/tools/config"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("Error loading config: %v", err)
 	}
 
-	db, err := database.New(cfg.DatabaseURL)
+	db, err := database.New(cfg.DatabasePath)
 	if err != nil {
 		log.Fatalf("Error connecting to database: %v", err)
 	}
