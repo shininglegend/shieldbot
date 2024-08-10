@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/google/martian/v3/log"
 	"github.com/shininglegend/shieldbot/internal/commands"
 	"github.com/shininglegend/shieldbot/internal/permissions"
 )
@@ -48,7 +47,6 @@ func (b *Bot) Start() error {
 	if err != nil {
 		return err
 	}
-	log.Infof("Bot is running as %s", b.session.State.User.Username)
 
 	b.pc.RegisterCommands(b.session)
 
