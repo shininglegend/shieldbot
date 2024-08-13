@@ -29,7 +29,11 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	// If not admin, check regular permissions
 	if !isAdmin {
-		canUse, err := b.pm.CanUseCommand(i.GuildID, i.Member.User.ID, i.ApplicationCommandData().Name)
+		if i.Member == nil {
+			b.editResponseEmbed(s, i, utils.CreateErrorEmbed("This bot is to be used in servers only."))
+			return
+		}
+		canUse, err := b.pm.CanUseCommand(s, i.GuildID, i.Member.User.ID, i.ApplicationCommandData().Name)
 		if err != nil {
 			log.Printf("Error checking permissions: %v", err)
 			b.editResponseEmbed(s, i, utils.CreateErrorEmbed("An error occurred while checking permissions."))

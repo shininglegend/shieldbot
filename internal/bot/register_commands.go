@@ -87,6 +87,19 @@ func (b *Bot) getConfigSubcommands() []*discordgo.ApplicationCommandOption {
 		},
 		{
 			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Name:        commands.SetIsolationRoleName,
+			Description: "Set the isolation role for the guild",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionRole,
+					Name:        "role",
+					Description: "The role to use for isolation",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
 			Name:        commands.AddPermName,
 			Description: "Set permission for a command. Admins override this.",
 			Options: []*discordgo.ApplicationCommandOption{
@@ -121,18 +134,6 @@ func (b *Bot) getConfigSubcommands() []*discordgo.ApplicationCommandOption {
 					Type:        discordgo.ApplicationCommandOptionRole,
 					Name:        "role",
 					Description: "The role to remove permission for",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        commands.SetIsolationRoleName,
-			Description: "Set the isolation role for the guild",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionRole,
-					Name:        "role",
-					Description: "The role to use for isolation",
 					Required:    true,
 				},
 			},

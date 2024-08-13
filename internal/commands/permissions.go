@@ -60,7 +60,7 @@ func (pc *PermissionCommands) handleViewPerms(s *discordgo.Session, in *discordg
 			if err != nil {
 				roleNames[i] = roleID // Use ID if role name can't be fetched
 			} else {
-				roleNames[i] = role.Name
+				roleNames[i] = fmt.Sprintf("%v `%v`", role.Mention(), role.ID)
 			}
 		}
 		description.WriteString(fmt.Sprintf("**%s**: %s\n", command, strings.Join(roleNames, ", ")))
@@ -77,7 +77,7 @@ func (pc *PermissionCommands) handleAddPerm(s *discordgo.Session, i *discordgo.I
 	if err != nil {
 		return utils.CreateErrorEmbed(fmt.Sprintf("Error adding permission: %v", err))
 	}
-	return utils.CreateEmbed("Permission Added", fmt.Sprintf("Permission for command '%s' has been granted to role %s", commandName, utils.SafeRoleName(role)))
+	return utils.CreateEmbed("Permission Added", fmt.Sprintf("Permission for command '%s' has been granted to role %s", commandName, role.Mention()))
 }
 
 func (pc *PermissionCommands) handleRemovePerm(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
@@ -97,7 +97,7 @@ func (pc *PermissionCommands) handleRemovePerm(s *discordgo.Session, i *discordg
 		return utils.CreateErrorEmbed(fmt.Sprintf("Error removing permission: %v", err))
 	}
 
-	return utils.CreateEmbed("Permission Removed", fmt.Sprintf("Permission for command '%s' has been removed from role %s", commandName, utils.SafeRoleName(role)))
+	return utils.CreateEmbed("Permission Removed", fmt.Sprintf("Permission for command '%s' has been removed from role %s", commandName, role.Mention()))
 }
 
 func (pc *PermissionCommands) handleSetIsolationRole(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
@@ -107,5 +107,5 @@ func (pc *PermissionCommands) handleSetIsolationRole(s *discordgo.Session, i *di
 	if err != nil {
 		return utils.CreateErrorEmbed(fmt.Sprintf("Error setting isolation role: %v", err))
 	}
-	return utils.CreateEmbed("Isolation Role Set", fmt.Sprintf("Isolation role has been set to %s", utils.SafeRoleName(role)))
+	return utils.CreateEmbed("Isolation Role Set", fmt.Sprintf("Isolation role has been set to %s", role.Mention()))
 }

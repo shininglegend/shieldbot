@@ -156,7 +156,7 @@ func (pm *PermissionManager) RemoveCommandPermission(guildID, commandName, roleI
 }
 
 // Updated CanUseCommand function
-func (pm *PermissionManager) CanUseCommand(guildID, userID, commandName string) (bool, error) {
+func (pm *PermissionManager) CanUseCommand(s *discordgo.Session, guildID, userID, commandName string) (bool, error) {
 	pm.cache.RLock()
 	roleIDs, ok := pm.cache.permissions[guildID][commandName]
 	pm.cache.RUnlock()
@@ -192,14 +192,17 @@ func (pm *PermissionManager) CanUseCommand(guildID, userID, commandName string) 
 	}
 
 	// Check if the user has any of the required roles
+	member, err := s.GuildMember(guildID, userID)
+	if err != nil {
+		return false, err
+	}
+
+	// Very slow function :sad:
 	for _, roleID := range roleIDs {
-		var hasRole bool
-		err := pm.db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = ? AND guild_id = ? AND roles LIKE ?)", userID, guildID, "%"+roleID+"%").Scan(&hasRole)
-		if err != nil {
-			return false, err
-		}
-		if hasRole {
-			return true, nil
+		for _, memberRoleID := range member.Roles {
+			if memberRoleID == roleID {
+				return true, nil
+			}
 		}
 	}
 
