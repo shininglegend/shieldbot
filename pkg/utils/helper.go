@@ -47,3 +47,22 @@ func CreateErrorEmbed(description string) *discordgo.MessageEmbed {
 		Color:       0xFF0000, // Red
 	}
 }
+
+// Contails function
+func Contains(slice []string, item string) bool {
+    for _, v := range slice {
+        if v == item {
+            return true
+        }
+    }
+    return false
+}
+
+func Remove(slice []string, item string) []string {
+    for i, v := range slice {
+        if v == item {
+            return append(slice[:i], slice[i+1:]...)
+        }
+    }
+    return slice
+}

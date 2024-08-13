@@ -3,10 +3,18 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/shininglegend/shieldbot/internal/permissions"
 	"github.com/shininglegend/shieldbot/pkg/utils"
+)
+
+const (
+	ViewPermName         = "viewperms"
+	AddPermName          = "addperm"
+	RemovePermName       = "removeperm"
+	SetIsolationRoleName = "setisolationrole"
 )
 
 type PermissionCommands struct {
@@ -17,62 +25,82 @@ func NewPermissionCommands(pm *permissions.PermissionManager) *PermissionCommand
 	return &PermissionCommands{pm: pm}
 }
 
-func (pc *PermissionCommands) RegisterCommands(s *discordgo.Session) {
-	commands := []*discordgo.ApplicationCommand{
-		{
-			Name:        "setperm",
-			Description: "Set permission for a command",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "command",
-					Description: "The command to set permission for",
-					Required:    true,
-				},
-				{
-					Type:        discordgo.ApplicationCommandOptionRole,
-					Name:        "role",
-					Description: "The role that can use the command",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "setisolationrole",
-			Description: "Set the isolation role for the guild",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionRole,
-					Name:        "role",
-					Description: "The role to use for isolation",
-					Required:    true,
-				},
-			},
-		},
-	}
+func (pc *PermissionCommands) HandleConfig(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.MessageEmbed {
+	options := i.ApplicationCommandData().Options
+	subcommand := options[0].Name
 
-	for _, v := range commands {
-		_, err := s.ApplicationCommandCreate(s.State.User.ID, "", v)
-		if err != nil {
-			fmt.Printf("Cannot create '%v' command: %v", v.Name, err)
-		}
+	switch subcommand {
+	case ViewPermName:
+		return pc.handleViewPerms(s, i)
+	case AddPermName:
+		return pc.handleAddPerm(s, i, options[0].Options)
+	case RemovePermName:
+		return pc.handleRemovePerm(s, i, options[0].Options)
+	case SetIsolationRoleName:
+		return pc.handleSetIsolationRole(s, i, options[0].Options)
+	default:
+		return utils.CreateErrorEmbed(fmt.Sprintf("Unknown subcommand: %v", subcommand))
 	}
 }
 
-func (pc *PermissionCommands) HandleSetPerm(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.MessageEmbed {
-	options := i.ApplicationCommandData().Options
+func (pc *PermissionCommands) handleViewPerms(s *discordgo.Session, in *discordgo.InteractionCreate) *discordgo.MessageEmbed {
+	perms, err := pc.pm.GetCommandPermissions(in.GuildID)
+	if err != nil {
+		return utils.CreateErrorEmbed(fmt.Sprintf("Error retrieving permissions: %v", err))
+	}
+
+	var description strings.Builder
+	if len(perms) == 0 {
+		description.WriteString("No Guild permissions set.")
+	}
+	for command, roles := range perms {
+		roleNames := make([]string, len(roles))
+		for i, roleID := range roles {
+			role, err := s.State.Role(in.GuildID, roleID)
+			if err != nil {
+				roleNames[i] = roleID // Use ID if role name can't be fetched
+			} else {
+				roleNames[i] = role.Name
+			}
+		}
+		description.WriteString(fmt.Sprintf("**%s**: %s\n", command, strings.Join(roleNames, ", ")))
+	}
+
+	return utils.CreateEmbed("Command Permissions", description.String())
+}
+
+func (pc *PermissionCommands) handleAddPerm(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	commandName := options[0].StringValue()
 	role := options[1].RoleValue(s, i.GuildID)
 
 	err := pc.pm.SetCommandPermission(i.GuildID, commandName, role.ID)
 	if err != nil {
-		return utils.CreateErrorEmbed(fmt.Sprintf("Error setting permission: %v", err))
+		return utils.CreateErrorEmbed(fmt.Sprintf("Error adding permission: %v", err))
 	}
-	return utils.CreateEmbed("Permission Set", fmt.Sprintf("Permission for command '%s' has been granted to role %s", commandName, utils.SafeRoleName(role)))
+	return utils.CreateEmbed("Permission Added", fmt.Sprintf("Permission for command '%s' has been granted to role %s", commandName, utils.SafeRoleName(role)))
 }
 
-func (pc *PermissionCommands) HandleSetIsolationRole(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.MessageEmbed {
-	options := i.ApplicationCommandData().Options
+func (pc *PermissionCommands) handleRemovePerm(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
+	if len(options) < 2 {
+		return utils.CreateErrorEmbed("Not enough options provided. Please specify both command and role.")
+	}
+
+	commandName := options[0].StringValue()
+	role := options[1].RoleValue(s, i.GuildID)
+
+	if role == nil {
+		return utils.CreateErrorEmbed("Invalid role provided.")
+	}
+
+	err := pc.pm.RemoveCommandPermission(i.GuildID, commandName, role.ID)
+	if err != nil {
+		return utils.CreateErrorEmbed(fmt.Sprintf("Error removing permission: %v", err))
+	}
+
+	return utils.CreateEmbed("Permission Removed", fmt.Sprintf("Permission for command '%s' has been removed from role %s", commandName, utils.SafeRoleName(role)))
+}
+
+func (pc *PermissionCommands) handleSetIsolationRole(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
 	role := options[0].RoleValue(s, i.GuildID)
 
 	err := pc.pm.SetIsolationRole(i.GuildID, role.ID)

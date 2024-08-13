@@ -30,13 +30,37 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 		return utils.CreateErrorEmbed("Failed to fetch isolation role")
 	}
 
+	// Ensure the person issuing the command has a role that is higher than the target's highest
+	issuer, err := s.GuildMember(i.GuildID, i.Member.User.ID)
+	if err != nil {
+		log.Printf("Error fetching issuer member: %v", err)
+		return utils.CreateErrorEmbed("Failed to fetch issuer member")
+	}
+
+	guild, err := s.Guild(i.GuildID)
+	if err != nil {
+		log.Printf("Error fetching guild: %v", err)
+		return utils.CreateErrorEmbed("Failed to fetch guild")
+	}
+
+	issuerHighestRole := getHighestRole(issuer.Roles, guild.Roles)
+	targetHighestRole := getHighestRole(member.Roles, guild.Roles)
+
+	if issuerHighestRole.Position <= targetHighestRole.Position {
+		return utils.CreateErrorEmbed("You don't have permission to isolate this user. Your highest role must be higher than the target user's highest role.")
+	}
+
 	// Save current roles
 	var roleIDs string
 	for _, roleID := range member.Roles {
 		if roleID == isolationRoleID {
 			return utils.CreateErrorEmbed(fmt.Sprintf("User %s is already isolated.", user.Mention()))
 		}
-		roleIDs = fmt.Sprintf("%s,%s", roleIDs, roleID)
+		if roleIDs != "" {
+			roleIDs = fmt.Sprintf("%s,%s", roleIDs, roleID)
+		} else {
+			roleIDs = roleID
+		}
 	}
 	_, err = b.db.Exec(`
         INSERT INTO user_roles (user_id, guild_id, roles) 
@@ -67,7 +91,7 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 			err = nil
 			continue
 		}
-		messages.AddMessage(fmt.Sprintf("Removed role %v", role.Mention()))
+		messages.AddMessage(fmt.Sprintf("Removed role %v from %v", role.Mention(), user.Mention()))
 	}
 
 	// Add isolation role based on db
@@ -76,7 +100,7 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 		log.Printf("Error adding isolation role: %v", err)
 		return utils.CreateErrorEmbed("Failed to add isolation role")
 	}
-	return utils.CreateEmbed(fmt.Sprintf("User %s has been isolated.", user.Mention()), messages.GetMessages(""))
+	return utils.CreateEmbed(fmt.Sprintf("User %s (`%v`) has been isolated.", user.Username, user.ID), messages.GetMessages(""))
 }
 
 func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.MessageEmbed {
@@ -109,6 +133,26 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 	if err != nil {
 		log.Printf("Error fetching member: %v", err)
 		return utils.CreateErrorEmbed("Failed to fetch member")
+	}
+
+	// Ensure the person issuing the command has a role that is higher than the target's highest
+	issuer, err := s.GuildMember(i.GuildID, i.Member.User.ID)
+	if err != nil {
+		log.Printf("Error fetching issuer member: %v", err)
+		return utils.CreateErrorEmbed("Failed to fetch issuer member")
+	}
+
+	guild, err := s.Guild(i.GuildID)
+	if err != nil {
+		log.Printf("Error fetching guild: %v", err)
+		return utils.CreateErrorEmbed("Failed to fetch guild")
+	}
+
+	issuerHighestRole := getHighestRole(issuer.Roles, guild.Roles)
+	targetHighestRole := getHighestRole(member.Roles, guild.Roles)
+
+	if issuerHighestRole.Position <= targetHighestRole.Position {
+		return utils.CreateErrorEmbed("You don't have permission to isolate this user. Your highest role must be higher than the target user's highest role.")
 	}
 
 	// Check if user is isolated
@@ -146,7 +190,7 @@ pass:
 				err = nil
 				continue
 			}
-			messages.AddMessage(fmt.Sprintf("Restored role %v", role.Mention()))
+			messages.AddMessage(fmt.Sprintf("Restored role %v to %v", role.Mention(), user.Mention()))
 		}
 		// Log the restored roles
 		log.Printf("Restored roles for user %s: %s", user.Username, roleIDs)
@@ -157,5 +201,21 @@ pass:
 	if err != nil {
 		log.Printf("Error deleting roles: %v", err)
 	}
-	return utils.CreateEmbed(fmt.Sprintf("User %s has been restored.", user.Mention()), messages.GetMessages(""))
+	return utils.CreateEmbed(fmt.Sprintf("User %s (`%v`) has been restored.", user.Username, user.ID), messages.GetMessages(""))
+}
+
+// Helper function to get the highest role
+func getHighestRole(memberRoles []string, guildRoles []*discordgo.Role) *discordgo.Role {
+	var highestRole *discordgo.Role
+	for _, roleID := range memberRoles {
+		for _, guildRole := range guildRoles {
+			if guildRole.ID == roleID {
+				if highestRole == nil || guildRole.Position > highestRole.Position {
+					highestRole = guildRole
+				}
+				break
+			}
+		}
+	}
+	return highestRole
 }

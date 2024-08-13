@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -30,6 +31,7 @@ func main() {
 
 	err = bot.Start()
 	if err != nil {
+		bot.Log(fmt.Sprintf("Failed to start: %v", err.Error()))
 		log.Fatalf("Error starting bot: %v", err)
 	}
 	log.Printf("Bot is running. Press Ctrl-C to stop.")

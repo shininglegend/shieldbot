@@ -3,17 +3,25 @@ package bot
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/shininglegend/shieldbot/internal/commands"
 	"github.com/shininglegend/shieldbot/internal/permissions"
 )
 
+const (
+	dev_channel_id = "1272795752145354873" // Channel ID, not User ID
+)
+
 type Bot struct {
-	session *discordgo.Session
-	db      *sql.DB
-	pm      *permissions.PermissionManager
-	pc      *commands.PermissionCommands
+	session            *discordgo.Session
+	db                 *sql.DB
+	pm                 *permissions.PermissionManager
+	pc                 *commands.PermissionCommands
+	registeredCommands map[string]*discordgo.ApplicationCommand
 }
 
 func New(token string, db *sql.DB) (*Bot, error) {
@@ -48,53 +56,41 @@ func (b *Bot) Start() error {
 		return err
 	}
 
-	b.pc.RegisterCommands(b.session)
-
-	return b.registerCommands()
+	err = b.registerCommands()
+	if err != nil {
+		return err
+	}
+	b.Log("Bot has started")
+	return err
 }
 
 func (b *Bot) Stop() {
 	b.session.Close()
 }
 
-func (b *Bot) registerCommands() error {
-	commands := []*discordgo.ApplicationCommand{
-		{
-			Name:        "sping",
-			Description: "Responds with Pong!",
-		},
-		{
-			Name:        "isolate",
-			Description: "Isolates a user by removing their roles",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionUser,
-					Name:        "user",
-					Description: "The user to isolate",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "restore",
-			Description: "Restores a user's roles",
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionUser,
-					Name:        "user",
-					Description: "The user to restore",
-					Required:    true,
-				},
-			},
-		},
-	}
-
-	for _, v := range commands {
-		_, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, "", v)
-		if err != nil {
-			return err
+// This does it's best to deliver messages!
+func (b *Bot) Log(msg string) {
+	_, err := b.session.ChannelMessageSend(dev_channel_id, msg)
+	if err != nil {
+		log.Printf("Failed to send message to developer! Error: %v", err)
+		// Retry a few times
+		var errors []error
+		errors = append(errors, err)
+		err = nil
+		for i := 0; i < 5; i++ {
+			time.Sleep(5 * time.Second)
+			_, err := b.session.ChannelMessageSend(dev_channel_id, msg)
+			if err != nil {
+				errors = append(errors, err)
+				err = nil
+				continue
+			}
+			// Try to send the errors as well
+			time.Sleep(100 * time.Microsecond)
+			_, _ = b.session.ChannelMessageSend(dev_channel_id, fmt.Sprintf("Previous messages failed. Errors %v", errors))
+			return
 		}
+		log.Printf("Message: %v", msg)
+		log.Fatalf("Errors: %v", errors)
 	}
-
-	return nil
 }

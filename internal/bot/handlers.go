@@ -44,16 +44,14 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	// Process the command
 	var embed *discordgo.MessageEmbed
-	switch i.ApplicationCommandData().Name {
-	case "sping":
+	switch n := i.ApplicationCommandData().Name; n {
+	case cmdPingType:
 		embed = b.handlePing(s, i)
-	case "setperm":
-		embed = b.pc.HandleSetPerm(s, i)
-	case "setisolationrole":
-		embed = b.pc.HandleSetIsolationRole(s, i)
-	case "isolate":
+	case cmdConfigType: // All /config commands are delegated to the same function
+		embed = b.pc.HandleConfig(s, i)
+	case cmdIsolate:
 		embed = b.handleIsolate(s, i)
-	case "restore":
+	case cmdRestore:
 		embed = b.handleRestore(s, i)
 	default:
 		embed = utils.CreateErrorEmbed("Unknown command")

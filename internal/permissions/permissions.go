@@ -7,13 +7,14 @@ import (
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/shininglegend/shieldbot/pkg/utils"
 )
 
 type PermissionManager struct {
 	db    *sql.DB
 	cache struct {
 		sync.RWMutex
-		permissions map[string]map[string]string // guildID -> commandName -> roleID
+		permissions map[string]map[string][]string // guildID -> commandName -> []roleID
 	}
 }
 
@@ -40,13 +41,17 @@ func NewPermissionManager(db *sql.DB) *PermissionManager {
 	pm := &PermissionManager{
 		db: db,
 	}
-	pm.cache.permissions = make(map[string]map[string]string)
+
+	pm.cache.permissions = make(map[string]map[string][]string)
 	return pm
 }
 
 func (pm *PermissionManager) loadPermissions() error {
 	pm.cache.Lock()
 	defer pm.cache.Unlock()
+
+	// Clear existing cache
+	pm.cache.permissions = make(map[string]map[string][]string)
 
 	rows, err := pm.db.Query("SELECT guild_id, command_name, role_id FROM command_permissions")
 	if err != nil {
@@ -59,21 +64,55 @@ func (pm *PermissionManager) loadPermissions() error {
 		if err := rows.Scan(&guildID, &commandName, &roleID); err != nil {
 			return err
 		}
+
 		if _, ok := pm.cache.permissions[guildID]; !ok {
-			pm.cache.permissions[guildID] = make(map[string]string)
+			pm.cache.permissions[guildID] = make(map[string][]string)
 		}
-		pm.cache.permissions[guildID][commandName] = roleID
+
+		pm.cache.permissions[guildID][commandName] = append(pm.cache.permissions[guildID][commandName], roleID)
 	}
 
 	return rows.Err()
 }
 
+func (pm *PermissionManager) GetCommandPermissions(guildID string) (map[string][]string, error) {
+	pm.cache.RLock()
+	cachedPerms, ok := pm.cache.permissions[guildID]
+	pm.cache.RUnlock()
+
+	if ok {
+		return cachedPerms, nil
+	}
+
+	rows, err := pm.db.Query("SELECT command_name, role_id FROM command_permissions WHERE guild_id = ?", guildID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	perms := make(map[string][]string)
+	for rows.Next() {
+		var commandName, roleID string
+		if err := rows.Scan(&commandName, &roleID); err != nil {
+			return nil, err
+		}
+		perms[commandName] = append(perms[commandName], roleID)
+	}
+
+	// Update cache
+	pm.cache.Lock()
+	pm.cache.permissions[guildID] = perms
+	pm.cache.Unlock()
+
+	return perms, nil
+}
+
+// Updated SetCommandPermission function
 func (pm *PermissionManager) SetCommandPermission(guildID, commandName, roleID string) error {
 	_, err := pm.db.Exec(`
-		INSERT INTO command_permissions (guild_id, command_name, role_id)
-		VALUES (?, ?, ?)
-		ON CONFLICT(guild_id, command_name) DO UPDATE SET role_id = ?`,
-		guildID, commandName, roleID, roleID)
+        INSERT OR IGNORE INTO command_permissions (guild_id, command_name, role_id)
+        VALUES (?, ?, ?)`,
+		guildID, commandName, roleID)
 	if err != nil {
 		return err
 	}
@@ -82,44 +121,89 @@ func (pm *PermissionManager) SetCommandPermission(guildID, commandName, roleID s
 	pm.cache.Lock()
 	defer pm.cache.Unlock()
 	if _, ok := pm.cache.permissions[guildID]; !ok {
-		pm.cache.permissions[guildID] = make(map[string]string)
+		pm.cache.permissions[guildID] = make(map[string][]string)
 	}
-	pm.cache.permissions[guildID][commandName] = roleID
+	if _, ok := pm.cache.permissions[guildID][commandName]; !ok {
+		pm.cache.permissions[guildID][commandName] = []string{}
+	}
+	if !utils.Contains(pm.cache.permissions[guildID][commandName], roleID) {
+		pm.cache.permissions[guildID][commandName] = append(pm.cache.permissions[guildID][commandName], roleID)
+	}
 
 	return nil
 }
 
+// Updated RemoveCommandPermission function
+func (pm *PermissionManager) RemoveCommandPermission(guildID, commandName, roleID string) error {
+	_, err := pm.db.Exec(`
+        DELETE FROM command_permissions
+        WHERE guild_id = ? AND command_name = ? AND role_id = ?`,
+		guildID, commandName, roleID)
+	if err != nil {
+		return err
+	}
+
+	// Update the cache
+	pm.cache.Lock()
+	defer pm.cache.Unlock()
+	if guildPerms, ok := pm.cache.permissions[guildID]; ok {
+		if roles, ok := guildPerms[commandName]; ok {
+			guildPerms[commandName] = utils.Remove(roles, roleID)
+		}
+	}
+
+	return nil
+}
+
+// Updated CanUseCommand function
 func (pm *PermissionManager) CanUseCommand(guildID, userID, commandName string) (bool, error) {
 	pm.cache.RLock()
-	roleID, ok := pm.cache.permissions[guildID][commandName]
+	roleIDs, ok := pm.cache.permissions[guildID][commandName]
 	pm.cache.RUnlock()
 
 	if !ok {
 		// If not in cache, check the database
-		err := pm.db.QueryRow("SELECT role_id FROM command_permissions WHERE guild_id = ? AND command_name = ?", guildID, commandName).Scan(&roleID)
+		rows, err := pm.db.Query("SELECT role_id FROM command_permissions WHERE guild_id = ? AND command_name = ?", guildID, commandName)
 		if err != nil {
-			if err == sql.ErrNoRows {
-				return false, nil
-			}
 			return false, err
+		}
+		defer rows.Close()
+
+		roleIDs = []string{}
+		for rows.Next() {
+			var roleID string
+			if err := rows.Scan(&roleID); err != nil {
+				return false, err
+			}
+			roleIDs = append(roleIDs, roleID)
 		}
 
 		// Update cache
 		pm.cache.Lock()
 		if _, ok := pm.cache.permissions[guildID]; !ok {
-			pm.cache.permissions[guildID] = make(map[string]string)
+			pm.cache.permissions[guildID] = make(map[string][]string)
 		}
-		pm.cache.permissions[guildID][commandName] = roleID
+		pm.cache.permissions[guildID][commandName] = roleIDs
 		pm.cache.Unlock()
 	}
 
-	var hasRole bool
-	err := pm.db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = ? AND guild_id = ? AND roles LIKE ?)", userID, guildID, "%"+roleID+"%").Scan(&hasRole)
-	if err != nil {
-		return false, err
+	if len(roleIDs) == 0 {
+		return false, nil
 	}
 
-	return hasRole, nil
+	// Check if the user has any of the required roles
+	for _, roleID := range roleIDs {
+		var hasRole bool
+		err := pm.db.QueryRow("SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = ? AND guild_id = ? AND roles LIKE ?)", userID, guildID, "%"+roleID+"%").Scan(&hasRole)
+		if err != nil {
+			return false, err
+		}
+		if hasRole {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (pm *PermissionManager) SetIsolationRole(guildID, roleID string) error {
@@ -146,7 +230,7 @@ func (pm *PermissionManager) SetupTables() error {
 			guild_id TEXT,
 			command_name TEXT,
 			role_id TEXT,
-			PRIMARY KEY (guild_id, command_name)
+			PRIMARY KEY (guild_id, command_name, role_id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS guild_settings (
 			guild_id TEXT,
