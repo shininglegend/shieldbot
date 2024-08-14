@@ -1,5 +1,7 @@
 # shieldbot
-This bot provides additional moderation features, such as an isolation and restore command. It has been designed to be expandable, but is currently very basic and mostly framework.
+This bot provides non-standard moderation features, such as an isolation and restore command. 
+Isolation and restore both require manage roles. Configuring the bot beyond that requires administrator in the relevant server.
+It has been designed to be expandable, but is currently basic and mostly framework.
 Maintained and updated by @shininglegend.
 
 ## Installation
