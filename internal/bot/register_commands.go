@@ -2,6 +2,10 @@
 package bot
 
 import (
+	"fmt"
+	"log"
+	"time"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/shininglegend/shieldbot/internal/commands"
 )
@@ -49,7 +53,7 @@ func (b *Bot) registerCommands() error {
 	}
 
 	for _, v := range commands {
-		cmd, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, "", v)
+		cmd, err := b.Session.ApplicationCommandCreate(b.Session.State.User.ID, "", v)
 		if err != nil {
 			return err
 		}
@@ -61,7 +65,7 @@ func (b *Bot) registerCommands() error {
 		Description: "Configure bot settings",
 		Options:     b.getConfigSubcommands(),
 	}
-	cmd, err := b.session.ApplicationCommandCreate(b.session.State.User.ID, "", v)
+	cmd, err := b.Session.ApplicationCommandCreate(b.Session.State.User.ID, "", v)
 	if err != nil {
 		return err
 	}
@@ -139,4 +143,33 @@ func (b *Bot) getConfigSubcommands() []*discordgo.ApplicationCommandOption {
 			},
 		},
 	}
+}
+
+// RefreshCommands re-registers all commands
+func (b *Bot) RefreshCommands() error {
+	// First, remove all existing commands
+	commands, err := b.Session.ApplicationCommands(b.Session.State.User.ID, "")
+	if err != nil {
+		return fmt.Errorf("error fetching existing commands: %w", err)
+	}
+
+	for _, cmd := range commands {
+		err := b.Session.ApplicationCommandDelete(b.Session.State.User.ID, "", cmd.ID)
+		if err != nil {
+			log.Printf("Error deleting command %s: %v", cmd.Name, err)
+		}
+	}
+
+	// Then, register all commands
+	err = b.registerCommands()
+	if err != nil {
+		// Handle rate limit errors
+		if e, ok := err.(*discordgo.RESTError); ok && e.Message != nil && e.Message.Code == discordgo.ErrCodeChannelHasHitWriteRateLimit {
+			time.Sleep(1 * time.Minute)
+			return b.RefreshCommands()
+		}
+		return fmt.Errorf("error registering commands: %w", err)
+	}
+
+	return nil
 }

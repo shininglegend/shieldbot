@@ -4,7 +4,6 @@ go 1.22.3
 
 require (
 	github.com/bwmarrin/discordgo v0.28.1
-	github.com/google/martian/v3 v3.3.3
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/spf13/viper v1.19.0
 )

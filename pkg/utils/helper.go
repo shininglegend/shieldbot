@@ -39,30 +39,45 @@ func CreateEmbed(title, description string) *discordgo.MessageEmbed {
 	}
 }
 
-// CreateErrorEmbed creates an embed with an error message
-func CreateErrorEmbed(description string) *discordgo.MessageEmbed {
+// CreateErrorEmbed creates an embed with an error message, and dms the developer
+func CreateErrorEmbed(s *discordgo.Session, desc string, err error) *discordgo.MessageEmbed {
+	SendToDevChannelDMs(s, fmt.Sprintf("Error: %v", err.Error()), 2)
 	return &discordgo.MessageEmbed{
 		Title:       "Error",
-		Description: description,
+		Description: desc,
 		Color:       0xFF0000, // Red
+		Footer: &discordgo.MessageEmbedFooter{
+			Text:         "Error reported to developer",
+			IconURL:      "",
+			ProxyIconURL: "",
+		},
+	}
+}
+
+// CreateNotAllowedEmbed creates an embed with a permission error message in yellow
+func CreateNotAllowedEmbed(title, desc string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Title:       title,
+		Description: desc,
+		Color:       0xFFFF00, // Yellow
 	}
 }
 
 // Contails function
 func Contains(slice []string, item string) bool {
-    for _, v := range slice {
-        if v == item {
-            return true
-        }
-    }
-    return false
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
 }
 
 func Remove(slice []string, item string) []string {
-    for i, v := range slice {
-        if v == item {
-            return append(slice[:i], slice[i+1:]...)
-        }
-    }
-    return slice
+	for i, v := range slice {
+		if v == item {
+			return append(slice[:i], slice[i+1:]...)
+		}
+	}
+	return slice
 }

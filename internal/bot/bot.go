@@ -3,28 +3,22 @@ package bot
 
 import (
 	"database/sql"
-	"fmt"
-	"log"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/shininglegend/shieldbot/internal/commands"
 	"github.com/shininglegend/shieldbot/internal/permissions"
-)
-
-const (
-	dev_channel_id = "1272795752145354873" // Channel ID, not User ID
+	"github.com/shininglegend/shieldbot/pkg/utils"
 )
 
 type Bot struct {
-	session            *discordgo.Session
+	Session            *discordgo.Session
 	db                 *sql.DB
 	pm                 *permissions.PermissionManager
 	pc                 *commands.PermissionCommands
 	registeredCommands map[string]*discordgo.ApplicationCommand
 }
 
-func New(token string, db *sql.DB) (*Bot, error) {
+func (*Bot) New(token string, db *sql.DB) (*Bot, error) {
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, err
@@ -39,7 +33,7 @@ func New(token string, db *sql.DB) (*Bot, error) {
 	pc := commands.NewPermissionCommands(pm)
 
 	bot := &Bot{
-		session: session,
+		Session: session,
 		db:      db,
 		pm:      pm,
 		pc:      pc,
@@ -51,7 +45,7 @@ func New(token string, db *sql.DB) (*Bot, error) {
 }
 
 func (b *Bot) Start() error {
-	err := b.session.Open()
+	err := b.Session.Open()
 	if err != nil {
 		return err
 	}
@@ -60,37 +54,18 @@ func (b *Bot) Start() error {
 	if err != nil {
 		return err
 	}
-	b.Log("Bot has started")
+
+	b.AddMessageHandlers()
+
+	
+	utils.SendToDevChannelDMs(b.Session, "Bot has started", 0)
 	return err
 }
 
 func (b *Bot) Stop() {
-	b.session.Close()
+	b.Session.Close()
 }
 
-// This does it's best to deliver messages!
-func (b *Bot) Log(msg string) {
-	_, err := b.session.ChannelMessageSend(dev_channel_id, msg)
-	if err != nil {
-		log.Printf("Failed to send message to developer! Error: %v", err)
-		// Retry a few times
-		var errors []error
-		errors = append(errors, err)
-		err = nil
-		for i := 0; i < 5; i++ {
-			time.Sleep(5 * time.Second)
-			_, err := b.session.ChannelMessageSend(dev_channel_id, msg)
-			if err != nil {
-				errors = append(errors, err)
-				err = nil
-				continue
-			}
-			// Try to send the errors as well
-			time.Sleep(100 * time.Microsecond)
-			_, _ = b.session.ChannelMessageSend(dev_channel_id, fmt.Sprintf("Previous messages failed. Errors %v", errors))
-			return
-		}
-		log.Printf("Message: %v", msg)
-		log.Fatalf("Errors: %v", errors)
-	}
+func (b *Bot) AddMessageHandlers() {
+	b.Session.AddHandler(b.handleDMMessage)
 }
