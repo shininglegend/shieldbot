@@ -89,15 +89,27 @@ func (pc *PermissionCommands) handleRemovePerm(s *discordgo.Session, i *discordg
 	if len(options) < 2 {
 		return utils.CreateNotAllowedEmbed("Not enough options provided.", "Please specify both command and role.")
 	}
-
 	commandName := options[0].StringValue()
 	role := options[1].RoleValue(s, i.GuildID)
+	// Check for existance
+	perms, err := pc.pm.GetCommandPermissions(i.GuildID)
+	if err != nil {
+		return utils.CreateErrorEmbed(s, "Error retrieving permissions", err)
+	}
+	// Check if the role has overrides
+	if _, ok := perms[commandName]; !ok {
+		return utils.CreateNotAllowedEmbed("No permission override found", "No permission override found for the command.")
+	}
+	// Check if the role has the permission
+	if !utils.Contains(perms[commandName], role.ID) {
+		return utils.CreateNotAllowedEmbed("Role does not have permission", "Role does not have permission for the command.")
+	}
 
 	if role == nil {
 		return utils.CreateNotAllowedEmbed("Role not found", "Role not found in the server.")
 	}
 
-	err := pc.pm.RemoveCommandPermission(i.GuildID, commandName, role.ID)
+	err = pc.pm.RemoveCommandPermission(i.GuildID, commandName, role.ID)
 	if err != nil {
 		return utils.CreateErrorEmbed(s, "Error removing permission", err)
 	}
