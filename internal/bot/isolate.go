@@ -21,23 +21,34 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 		return e
 	}
 
+	// Ensure the target is not this bot
+	if user.ID == s.State.User.ID {
+		err := s.UpdateGameStatus(0, "Wearing a mask.")
+		if err != nil {
+			log.Printf("Error setting status: %v", err)
+			utils.SendToDevChannelDMs(s, fmt.Sprintf("Error setting status: %v", err), 1)
+			err = nil
+		}
+		return utils.CreateNotAllowedEmbed("Hey! I was being a nice bot :(", "(Fine, I'll put on a mask. But I can't change my roles!)")
+	}
+
 	// Ensure the person issuing the command has a role that is higher than the target's highest
 	issuer, err := s.GuildMember(i.GuildID, i.Member.User.ID)
 	if err != nil {
 		log.Printf("Error fetching issuer member: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch issuer member", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch issuer member", err)
 	}
 
 	guild, err := s.Guild(i.GuildID)
 	if err != nil {
 		log.Printf("Error fetching guild: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch guild", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch guild", err)
 	}
 
 	member, err := s.GuildMember(i.GuildID, user.ID)
 	if err != nil {
 		log.Printf("Error fetching member: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch member", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch member", err)
 	}
 	// Get isolation role
 	isolationRoleID, err := b.pm.GetIsolationRoleID(i.GuildID)
@@ -46,13 +57,13 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 			return utils.CreateNotAllowedEmbed("Isolation role not set.", "Please set it using /config setisolationrole.")
 		}
 		log.Printf("Error fetching isolation role: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch isolation role", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch isolation role", err)
 	}
 
-	issuerHighestRole := getHighestRole(issuer.Roles, guild.Roles)
-	targetHighestRole := getHighestRole(member.Roles, guild.Roles)
+	issuerHighestRole := utils.GetHighestRole(issuer.Roles, guild.Roles)
+	targetHighestRole := utils.GetHighestRole(member.Roles, guild.Roles)
 
-	if issuerHighestRole.Position <= targetHighestRole.Position {
+	if issuerHighestRole == nil || (targetHighestRole != nil && issuerHighestRole.Position <= targetHighestRole.Position) {
 		return utils.CreateNotAllowedEmbed("Ayo, you can't do that!", "You don't have permission to isolate this user. Your highest role must be higher than the target user's highest role.")
 	}
 
@@ -76,7 +87,7 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 		user.ID, i.GuildID, roleIDs, roleIDs)
 	if err != nil {
 		log.Printf("Error saving roles: %v", err)
-		return utils.CreateErrorEmbed(s, "Error: Failed to save roles to database. Manually isolate the user.", err)
+		return utils.CreateErrorEmbed(s, i, "Error: Failed to save roles to database. Manually isolate the user.", err)
 	}
 
 	// Remove all roles
@@ -106,7 +117,7 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 	err = s.GuildMemberRoleAdd(i.GuildID, user.ID, isolationRoleID)
 	if err != nil {
 		log.Printf("Error adding isolation role: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to add isolation role", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to add isolation role", err)
 	}
 	return utils.CreateEmbed(fmt.Sprintf("User %s (`%v`) has been isolated.", user.Username, user.ID), messages.GetMessages(""))
 }
@@ -121,6 +132,18 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 		return e
 	}
 
+	// Ensure the target is not this bot
+	if user.ID == s.State.User.ID {
+		// Update status:
+		err := s.UpdateGameStatus(0, "Sending users to the shadow realm on demand.")
+		if err != nil {
+			log.Printf("Error setting status: %v", err)
+			utils.SendToDevChannelDMs(s, fmt.Sprintf("Error setting status: %v", err), 1)
+			err = nil
+		}
+		return utils.CreateNotAllowedEmbed("Why thank you!", "I'm flattered, but I can't restore myself.")
+	}
+
 	var roleIDs string
 	err := b.db.QueryRow("SELECT roles FROM user_roles WHERE user_id = ? AND guild_id = ?", user.ID, i.GuildID).Scan(&roleIDs)
 	if err != nil {
@@ -128,7 +151,7 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 			return utils.CreateNotAllowedEmbed("Unable to restore", "No roles found to restore. Are you sure this user was isolated using the bot?")
 		} else {
 			log.Printf("Error fetching roles: %v", err)
-			return utils.CreateErrorEmbed(s, "Failed to fetch roles", err)
+			return utils.CreateErrorEmbed(s, i, "Failed to fetch roles", err)
 		}
 	}
 
@@ -139,33 +162,33 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 			return utils.CreateNotAllowedEmbed("Isolation role not set.", "Please set it using /setisolationrole.")
 		}
 		log.Printf("Error fetching isolation role: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch isolation role", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch isolation role", err)
 	}
 
 	// Ensure the person issuing the command has a role that is higher than the target's highest
 	issuer, err := s.GuildMember(i.GuildID, i.Member.User.ID)
 	if err != nil {
 		log.Printf("Error fetching issuer member: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch issuer member", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch issuer member", err)
 	}
 
 	guild, err := s.Guild(i.GuildID)
 	if err != nil {
 		log.Printf("Error fetching guild: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch guild", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch guild", err)
 	}
 
 	member, err := s.GuildMember(i.GuildID, user.ID)
 	if err != nil {
 		log.Printf("Error fetching member: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch member", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch member", err)
 	}
 
-	issuerHighestRole := getHighestRole(issuer.Roles, guild.Roles)
-	targetHighestRole := getHighestRole(member.Roles, guild.Roles)
+	issuerHighestRole := utils.GetHighestRole(issuer.Roles, guild.Roles)
+	targetHighestRole := utils.GetHighestRole(member.Roles, guild.Roles)
 
-	if issuerHighestRole.Position <= targetHighestRole.Position {
-		return utils.CreateErrorEmbed(s, "You don't have permission to isolate this user. Your highest role must be higher than the target user's highest role.", err)
+	if issuerHighestRole == nil || (targetHighestRole != nil && issuerHighestRole.Position <= targetHighestRole.Position) {
+		return utils.CreateErrorEmbed(s, i, "You don't have permission to isolate this user. Your highest role must be higher than the target user's highest role.", err)
 	}
 
 	// Check if user is isolated
@@ -174,7 +197,7 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 			goto pass
 		}
 	}
-	return utils.CreateErrorEmbed(s, fmt.Sprintf("User %s is not isolated.", user.Mention()), err)
+	return utils.CreateErrorEmbed(s, i, fmt.Sprintf("User %s is not isolated.", user.Mention()), err)
 
 pass:
 	// Remove isolation role
@@ -217,20 +240,4 @@ pass:
 		log.Printf("Error deleting roles: %v", err)
 	}
 	return utils.CreateEmbed(fmt.Sprintf("User %s (`%v`) has been restored.", user.Username, user.ID), messages.GetMessages(""))
-}
-
-// Helper function to get the highest role
-func getHighestRole(memberRoles []string, guildRoles []*discordgo.Role) *discordgo.Role {
-	var highestRole *discordgo.Role
-	for _, roleID := range memberRoles {
-		for _, guildRole := range guildRoles {
-			if guildRole.ID == roleID {
-				if highestRole == nil || guildRole.Position > highestRole.Position {
-					highestRole = guildRole
-				}
-				break
-			}
-		}
-	}
-	return highestRole
 }

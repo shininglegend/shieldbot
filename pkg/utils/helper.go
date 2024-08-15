@@ -35,13 +35,14 @@ func CreateEmbed(title, description string) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{
 		Title:       title,
 		Description: description,
-		Color:       0x00BFFF, // DeepSkyBlue
+		Color:       0x00FF00, // Green
 	}
 }
 
-// CreateErrorEmbed creates an embed with an error message, and dms the developer
-func CreateErrorEmbed(s *discordgo.Session, desc string, err error) *discordgo.MessageEmbed {
-	SendToDevChannelDMs(s, fmt.Sprintf("Error: %v", err.Error()), 2)
+// CreateErrorEmbed i *discordgo.InteractionCreate, creates an embed with an error message, and dms the developer
+func CreateErrorEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, desc string, err error) *discordgo.MessageEmbed {
+	// Send a message to the developer with a link to the message, the user, and the error
+	SendToDevChannelDMs(s, fmt.Sprintf("Error: `%v`\nUser: %v | Channel: %v", err, i.Member.User.ID, i.ChannelID), 2)
 	return &discordgo.MessageEmbed{
 		Title:       "Error",
 		Description: desc,
@@ -80,4 +81,20 @@ func Remove(slice []string, item string) []string {
 		}
 	}
 	return slice
+}
+
+// Helper function to get the highest role, could return nil
+func GetHighestRole(memberRoles []string, guildRoles []*discordgo.Role) *discordgo.Role {
+	var highestRole *discordgo.Role
+	for _, roleID := range memberRoles {
+		for _, guildRole := range guildRoles {
+			if guildRole.ID == roleID {
+				if highestRole == nil || guildRole.Position > highestRole.Position {
+					highestRole = guildRole
+				}
+				//break
+			}
+		}
+	}
+	return highestRole
 }

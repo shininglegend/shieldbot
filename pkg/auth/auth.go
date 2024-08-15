@@ -27,13 +27,13 @@ func QuickAuthManageRolesOrOverride(pm *permissions.PermissionManager, s *discor
 	permissions, err := s.UserChannelPermissions(i.Member.User.ID, i.ChannelID)
 	if err != nil {
 		log.Printf("Error fetching permissions: %v", err)
-		return utils.CreateErrorEmbed(s, ErrorGeneric, err)
+		return utils.CreateErrorEmbed(s, i, ErrorGeneric, err)
 	}
 	if permissions&discordgo.PermissionManageRoles != discordgo.PermissionManageRoles {
 		allowed, err := pm.CanUseCommand(s, i.GuildID, i.Member.User.ID, "isolate")
 		if err != nil {
 			log.Printf("Error checking permissions: %v", err)
-			return utils.CreateErrorEmbed(s, ErrorGeneric, err)
+			return utils.CreateErrorEmbed(s, i, ErrorGeneric, err)
 		}
 		if !allowed {
 			return AddMissingPerms(utils.CreateNotAllowedEmbed(ErrorNoPerms, ""), []string{"Manage Roles"})
@@ -52,13 +52,13 @@ func QuickAuthAdminOrOverride(pm *permissions.PermissionManager, s *discordgo.Se
 	// Check if user is admin
 	isAdmin, err := pm.IsAdmin(s, i.GuildID, i.Member.User.ID)
 	if err != nil {
-		return utils.CreateErrorEmbed(s, fmt.Sprintf("Error checking admin status: %v", err), err)
+		return utils.CreateErrorEmbed(s, i, fmt.Sprintf("Error checking admin status: %v", err), err)
 	}
 	if !isAdmin {
 		canUse, err := pm.CanUseCommand(s, i.GuildID, i.Member.User.ID, i.ApplicationCommandData().Name)
 		if err != nil {
 			log.Printf("Error checking permissions: %v", err)
-			return utils.CreateErrorEmbed(s, ErrorGeneric, err)
+			return utils.CreateErrorEmbed(s, i, ErrorGeneric, err)
 		}
 		if !canUse {
 			return AddMissingPerms(utils.CreateNotAllowedEmbed(ErrorNoPerms, ""), []string{"Administrator"})
@@ -78,13 +78,13 @@ func QuickAuthManageMessagesOrOverride(pm *permissions.PermissionManager, s *dis
 	permissions, err := s.UserChannelPermissions(i.Member.User.ID, i.ChannelID)
 	if err != nil {
 		log.Printf("Error fetching permissions: %v", err)
-		return utils.CreateErrorEmbed(s, "Failed to fetch permissions", err)
+		return utils.CreateErrorEmbed(s, i, "Failed to fetch permissions", err)
 	}
 	if permissions&discordgo.PermissionManageMessages != discordgo.PermissionManageMessages {
 		allowed, err := pm.CanUseCommand(s, i.GuildID, i.Member.User.ID, "purge")
 		if err != nil {
 			log.Printf("Error checking permissions: %v", err)
-			return utils.CreateErrorEmbed(s, ErrorGeneric, err)
+			return utils.CreateErrorEmbed(s, i, ErrorGeneric, err)
 		}
 		if !allowed {
 			return AddMissingPerms(utils.CreateNotAllowedEmbed(ErrorNoPerms, ""), []string{"Manage Messages"})
