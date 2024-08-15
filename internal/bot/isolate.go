@@ -43,7 +43,7 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 	isolationRoleID, err := b.pm.GetIsolationRoleID(i.GuildID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return utils.CreateNotAllowedEmbed("Isolation role not set.", "Please set it using /setisolationrole.")
+			return utils.CreateNotAllowedEmbed("Isolation role not set.", "Please set it using /config setisolationrole.")
 		}
 		log.Printf("Error fetching isolation role: %v", err)
 		return utils.CreateErrorEmbed(s, "Failed to fetch isolation role", err)

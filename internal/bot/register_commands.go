@@ -13,6 +13,7 @@ import (
 const (
 	// These are the names of the slash commands, to be consistent with the command handler.
 	cmdPingType   = "pings"
+	cmdHelp       = "help"
 	cmdConfigType = "config" // Subcommands elsewhere
 	cmdIsolate    = "isolate"
 	cmdRestore    = "restore"
@@ -25,6 +26,10 @@ func (b *Bot) registerCommands() error {
 		{
 			Name:        cmdPingType,
 			Description: "Responds with Pong!",
+		},
+		{
+			Name:        cmdHelp,
+			Description: "Shows basic bot usage",
 		},
 		{
 			Name:        cmdIsolate,

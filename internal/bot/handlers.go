@@ -25,6 +25,8 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 	switch n := i.ApplicationCommandData().Name; n {
 	case cmdPingType:
 		embed = b.handlePing(s, i)
+	case cmdHelp:
+		embed = b.handleHelp(s, i)
 	case cmdConfigType: // All /config commands are delegated to the same function
 		embed = b.pc.HandleConfig(s, i) // Needs admin permissions
 	case cmdIsolate:
@@ -53,6 +55,37 @@ func (b *Bot) handlePing(s *discordgo.Session, _ *discordgo.InteractionCreate) *
 	return utils.CreateEmbed("Pong!", fmt.Sprintf("%v ms", s.HeartbeatLatency().Milliseconds()))
 }
 
+// Help command showing basic bot usage
+func (b *Bot) handleHelp(_ *discordgo.Session, _ *discordgo.InteractionCreate) *discordgo.MessageEmbed {
+	embed := utils.CreateEmbed("Bot Help", "This is a basic help command for the bot.")
+	info := []*discordgo.MessageEmbedField{
+		// Default commands
+		{
+			Name:   "Commands",
+			Value:  "/ping - Check the bot's response time",
+			Inline: false,
+		},
+		// Isolate and restore
+		{
+			Name: "Isolation Commands",
+			Value: "/isolate - Isolate a user in the guild\n" +
+				"/restore - Restore a user in the guild\n",
+			Inline: false,
+		},
+		// Config commands
+		{
+			Name: "Config Commands",
+			Value: "/config setisolationrole - Set the isolation role for the guild\n" +
+				"/config viewperms - View the permissions of commands for the guild\n" +
+				"/config addperm - Set the permission override for a command for a role\n" +
+				"/config removeperm - Remove the permission override for a command for a role\n",
+			Inline: false,
+		},
+	}
+	embed.Fields = append(embed.Fields, info...)
+	return embed
+}
+
 func (b *Bot) handleDMMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore messages from the bot itself
 	if m.Author.ID == s.State.User.ID {
@@ -79,7 +112,6 @@ func (b *Bot) handleDMMessage(s *discordgo.Session, m *discordgo.MessageCreate) 
 		}
 		return
 	}
-	
 
 	// Check if the message is "refresh"
 	if strings.ToLower(m.Content) == "refresh" {
