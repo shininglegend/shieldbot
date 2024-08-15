@@ -7,14 +7,14 @@ Maintained and updated by @shininglegend.
 ## Installation
 Clone the repo to local: `git clone https://github.com/shininglegend/shieldbot.git`
 
-Install the needed libraries. (You're on your own for this one!)
-
 Copy and rename the copy of `config sample.yaml` to `config.yaml`
 
 Make a database file: `sqlite3 ./data/main.db` 
 *Note: Update the config.yaml if you change the path!*
 
 Put your bot token in `config.yaml`
+
+Ensure go is installed. See https://go.dev/doc/install if needed.
 
 ## Usage
 ```bash
