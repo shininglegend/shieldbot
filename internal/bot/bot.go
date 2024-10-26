@@ -24,6 +24,9 @@ func (*Bot) New(token string, db *sql.DB) (*Bot, error) {
 		return nil, err
 	}
 
+	// Request intents
+	session.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
+
 	pm := permissions.NewPermissionManager(db)
 	err = pm.SetupTables()
 	if err != nil {
@@ -45,19 +48,23 @@ func (*Bot) New(token string, db *sql.DB) (*Bot, error) {
 }
 
 func (b *Bot) Start() error {
+	// Open the session
 	err := b.Session.Open()
 	if err != nil {
 		return err
 	}
-
+	// Register all other events
 	err = b.registerCommands()
 	if err != nil {
 		return err
 	}
 
+	// Register join and leave events
+	b.registerEvents()
+
+	// Add message handlers
 	b.AddMessageHandlers()
 
-	
 	utils.SendToDevChannelDMs(b.Session, "Bot has started", 0)
 	return err
 }
@@ -68,4 +75,9 @@ func (b *Bot) Stop() {
 
 func (b *Bot) AddMessageHandlers() {
 	b.Session.AddHandler(b.handleDMMessage)
+}
+
+func (b *Bot) registerEvents() {
+	b.Session.AddHandler(b.HandleJoin)
+	b.Session.AddHandler(b.HandleLeave)
 }

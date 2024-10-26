@@ -47,6 +47,9 @@ func (b *Bot) handleIsolate(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	member, err := s.GuildMember(i.GuildID, user.ID)
 	if err != nil {
+		if utils.CheckError(err, discordgo.ErrCodeUnknownMember) {
+			return utils.CreateNotAllowedEmbed("User not found", "The user you are trying to isolate is not in this server.")
+		}
 		log.Printf("Error fetching member: %v", err)
 		return utils.CreateErrorEmbed(s, i, "Failed to fetch member", err)
 	}
@@ -180,6 +183,9 @@ func (b *Bot) handleRestore(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	member, err := s.GuildMember(i.GuildID, user.ID)
 	if err != nil {
+		if utils.CheckError(err, discordgo.ErrCodeUnknownMember) {
+			return utils.CreateNotAllowedEmbed("User not found", "The user you are trying to restore is not in this server.")
+		}
 		log.Printf("Error fetching member: %v", err)
 		return utils.CreateErrorEmbed(s, i, "Failed to fetch member", err)
 	}

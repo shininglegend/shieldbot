@@ -30,6 +30,12 @@ func SafeRoleName(role *discordgo.Role) string {
 	return strings.ReplaceAll(role.Name, "@", "@\u200B")
 }
 
+// Checks an error message for a specific discord error code
+func CheckError(err error, checkCode int) bool {
+	e, ok := err.(*discordgo.RESTError)
+	return ok && e.Message != nil && e.Message.Code == checkCode
+}
+
 // CreateEmbed creates a simple embed with a title and description
 func CreateEmbed(title, description string) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{
