@@ -16,6 +16,7 @@ const (
 	AddPermName          = "addperm"
 	RemovePermName       = "removeperm"
 	SetIsolationRoleName = "setisolationrole"
+	SetLogChannel        = "setlogchannel"
 )
 
 type PermissionCommands struct {
@@ -43,6 +44,8 @@ func (pc *PermissionCommands) HandleConfig(s *discordgo.Session, i *discordgo.In
 		return pc.handleRemovePerm(s, i, options[0].Options)
 	case SetIsolationRoleName:
 		return pc.handleSetIsolationRole(s, i, options[0].Options)
+	case SetLogChannel:
+		return pc.handleSetLogChannel(s, i, options[0].Options)
 	default:
 		return utils.CreateNotAllowedEmbed("Unknown subcommand to config", fmt.Sprintf("Unknown subcommand: %v", subcommand))
 	}
@@ -159,4 +162,29 @@ func (pc *PermissionCommands) handleSetIsolationRole(s *discordgo.Session, i *di
 		return utils.CreateErrorEmbed(s, i, "Error setting isolation role", err)
 	}
 	return utils.CreateEmbed("Isolation Role Set", fmt.Sprintf("Isolation role has been set to %s", role.Mention()))
+}
+
+func (pc *PermissionCommands) handleSetLogChannel(s *discordgo.Session, i *discordgo.InteractionCreate, options []*discordgo.ApplicationCommandInteractionDataOption) *discordgo.MessageEmbed {
+	channel := options[0].ChannelValue(s)
+	// Ensure the channel exists and you have perms to manage it
+	if channel == nil {
+		return utils.CreateNotAllowedEmbed("Error setting log channel", "The specified channel does not exist")
+	}
+
+	// Get the bot's permissions in the guild
+	botPerms, err := s.State.UserChannelPermissions(s.State.User.ID, i.ChannelID)
+	if err != nil {
+		return utils.CreateErrorEmbed(s, i, "Error checking bot permissions", err)
+	}
+
+	// Check if the bot has permission to send messages in the channel
+	if botPerms&discordgo.PermissionSendMessages == 0 {
+		return utils.CreateNotAllowedEmbed("Insufficient bot permissions", "The bot doesn't have permission to send messages in the channel")
+	}
+
+	err = pc.pm.SetLogChannel(i.GuildID, channel.ID)
+	if err != nil {
+		return utils.CreateErrorEmbed(s, i, "Error setting log channel", err)
+	}
+	return utils.CreateEmbed("Log Channel Set", fmt.Sprintf("Log channel has been set to %s", channel.Mention()))
 }

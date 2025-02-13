@@ -17,6 +17,7 @@ const (
 	cmdConfigType = "config" // Subcommands elsewhere
 	cmdIsolate    = "isolate"
 	cmdRestore    = "restore"
+	cmdLogging    = "log"
 )
 
 func (b *Bot) registerCommands() error {
@@ -40,6 +41,39 @@ func (b *Bot) registerCommands() error {
 					Name:        "user",
 					Description: "The user to isolate",
 					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        cmdLogging,
+			Description: "Log a moderator action",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionUser,
+					Name:        "user",
+					Description: "The user you took action on",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "action",
+					Description: "The action you took",
+					Required:    true,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{Name: "Verbal Warning", Value: actionVerbalWarn},
+						{Name: "Bot Warning", Value: actionBotWarn},
+						{Name: "Timeout", Value: actionTimeout},
+						{Name: "Isolate", Value: actionIsolate},
+						{Name: "Kick", Value: actionKick},
+						{Name: "Permanent Ban", Value: actionBan},
+						{Name: "Other", Value: actionOther},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "reason",
+					Description: "The reason for the action",
+					Required:    false,
 				},
 			},
 		},
@@ -103,6 +137,19 @@ func (b *Bot) getConfigSubcommands() []*discordgo.ApplicationCommandOption {
 					Type:        discordgo.ApplicationCommandOptionRole,
 					Name:        "role",
 					Description: "The role to use for isolation",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Type:        discordgo.ApplicationCommandOptionSubCommand,
+			Name:        commands.SetLogChannel,
+			Description: "Set the log channel for the guild",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionChannel,
+					Name:        "channel",
+					Description: "The channel to use for logging",
 					Required:    true,
 				},
 			},

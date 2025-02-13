@@ -227,8 +227,27 @@ func (pm *PermissionManager) GetIsolationRoleID(guildID string) (string, error) 
 	return roleID, nil
 }
 
+func (pm *PermissionManager) SetLogChannel(guildID, channelID string) error {
+	_, err := pm.db.Exec(`
+		INSERT INTO guild_settings (guild_id, setting_name, role_id)
+		VALUES (?, 'log_channel', ?)
+		ON CONFLICT(guild_id, setting_name) DO UPDATE SET role_id = ?`,
+		guildID, channelID, channelID)
+	return err
+}
+
+func (pm *PermissionManager) GetLogChannelID(guildID string) (string, error) {
+	var channelID string
+	err := pm.db.QueryRow("SELECT role_id FROM guild_settings WHERE guild_id = ? AND setting_name = 'log_channel'", guildID).Scan(&channelID)
+	if err != nil {
+		return "", err
+	}
+	return channelID, nil
+}
+
 func (pm *PermissionManager) SetupTables() error {
 	queries := []string{
+		// In the future, role_id should be called setting_id instead. Do not expect it to be a role ID.
 		`CREATE TABLE IF NOT EXISTS command_permissions (
 			guild_id TEXT,
 			command_name TEXT,
@@ -238,7 +257,7 @@ func (pm *PermissionManager) SetupTables() error {
 		`CREATE TABLE IF NOT EXISTS guild_settings (
 			guild_id TEXT,
 			setting_name TEXT,
-			role_id TEXT,
+			role_id TEXT, 
 			PRIMARY KEY (guild_id, setting_name)
 		)`,
 	}

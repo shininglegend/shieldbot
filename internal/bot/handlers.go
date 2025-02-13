@@ -14,6 +14,9 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 	// Acknowledge the interaction immediately
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	})
 	if err != nil {
 		log.Printf("Error acknowledging interaction: %v", err)
@@ -22,6 +25,7 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	// Process the command
 	var embed *discordgo.MessageEmbed
+	var privateResponse bool
 	switch n := i.ApplicationCommandData().Name; n {
 	case cmdPingType:
 		embed = b.handlePing(s, i)
@@ -31,6 +35,9 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 		embed = b.pc.HandleConfig(s, i) // Needs admin permissions
 	case cmdIsolate:
 		embed = b.handleIsolate(s, i) // Needs manage roles permissions
+	case cmdLogging:
+		embed = b.handleLogging(s, i) // Needs manage messages permissions
+		privateResponse = true
 	case cmdRestore:
 		embed = b.handleRestore(s, i) // Needs manage roles permissions
 	default:
@@ -38,10 +45,27 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 	}
 
 	// Edit the original response with the command output
-	b.editResponseEmbed(s, i, embed)
+	b.editResponseEmbed(s, i, privateResponse, embed)
 }
 
-func (b *Bot) editResponseEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embed *discordgo.MessageEmbed) {
+func (b *Bot) editResponseEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, private bool, embed *discordgo.MessageEmbed) {
+	if !private {
+		// For non-private responses, create a new follow-up message without ephemeral flag
+		err := s.InteractionResponseDelete(i.Interaction)
+		if err != nil {
+			log.Printf("Error deleting original response: %v", err)
+			return
+		}
+		_, err = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		})
+		if err != nil {
+			log.Printf("Error creating follow-up message: %v", err)
+		}
+		return
+	}
+
+	// For private responses, edit the original ephemeral message
 	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Embeds: &[]*discordgo.MessageEmbed{embed},
 	})
