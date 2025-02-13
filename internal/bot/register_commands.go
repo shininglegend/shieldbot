@@ -52,7 +52,7 @@ func (b *Bot) registerCommands() error {
 		},
 		{
 			Name:        cmdLogging,
-			Description: "Log a moderator action. Use log-external if the user isn't showing.",
+			Description: "Log a moderator action. Use elog if the user isn't showing.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
@@ -85,7 +85,7 @@ func (b *Bot) registerCommands() error {
 		},
 		{
 			Name:        cmdLoggingExt,
-			Description: "Log a moderator action by ID or Username. Use log if the user is in the server.",
+			Description: "Log a moderator action by ID. Use log if the user is in the server.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
