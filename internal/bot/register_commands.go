@@ -18,23 +18,29 @@ const (
 	cmdIsolate    = "isolate"
 	cmdRestore    = "restore"
 	cmdLogging    = "log"
+	cmdLoggingExt = "elog" // For logging of non-server-members
 )
 
 func (b *Bot) registerCommands() error {
 	b.registeredCommands = make(map[string]*discordgo.ApplicationCommand)
+	canDM := true
+	cannotDM := !canDM
 
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name:        cmdPingType,
-			Description: "Responds with Pong!",
+			Name:         cmdPingType,
+			Description:  "Responds with Pong!",
+			DMPermission: &canDM,
 		},
 		{
-			Name:        cmdHelp,
-			Description: "Shows basic bot usage",
+			Name:         cmdHelp,
+			Description:  "Shows basic bot usage",
+			DMPermission: &canDM,
 		},
 		{
-			Name:        cmdIsolate,
-			Description: "Isolates a user by removing their roles",
+			Name:         cmdIsolate,
+			DMPermission: &cannotDM,
+			Description:  "Isolates a user by removing their roles",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
@@ -46,7 +52,7 @@ func (b *Bot) registerCommands() error {
 		},
 		{
 			Name:        cmdLogging,
-			Description: "Log a moderator action",
+			Description: "Log a moderator action. Use log-external if the user isn't showing.",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,
@@ -78,8 +84,42 @@ func (b *Bot) registerCommands() error {
 			},
 		},
 		{
-			Name:        cmdRestore,
-			Description: "Restores a user's roles",
+			Name:        cmdLoggingExt,
+			Description: "Log a moderator action by ID or Username. Use log if the user is in the server.",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "user",
+					Description: "The user you took action on",
+					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "action",
+					Description: "The action you took",
+					Required:    true,
+					Choices: []*discordgo.ApplicationCommandOptionChoice{
+						{Name: "Verbal Warning", Value: actionVerbalWarn},
+						{Name: "Bot Warning", Value: actionBotWarn},
+						{Name: "Timeout", Value: actionTimeout},
+						{Name: "Isolate", Value: actionIsolate},
+						{Name: "Kick", Value: actionKick},
+						{Name: "Permanent Ban", Value: actionBan},
+						{Name: "Other", Value: actionOther},
+					},
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "reason",
+					Description: "The reason for the action",
+					Required:    false,
+				},
+			},
+		},
+		{
+			Name:         cmdRestore,
+			DMPermission: &cannotDM,
+			Description:  "Restores a user's roles",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionUser,

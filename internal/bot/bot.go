@@ -66,7 +66,7 @@ func (b *Bot) Start() error {
 	b.AddMessageHandlers()
 
 	utils.SendToDevChannelDMs(b.Session, "Bot has started", 0)
-	return err
+	return nil
 }
 
 func (b *Bot) Stop() {

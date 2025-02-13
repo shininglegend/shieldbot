@@ -25,21 +25,26 @@ func (b *Bot) handleCommands(s *discordgo.Session, i *discordgo.InteractionCreat
 
 	// Process the command
 	var embed *discordgo.MessageEmbed
-	var privateResponse bool
+	var privateResponse bool = true
 	switch n := i.ApplicationCommandData().Name; n {
 	case cmdPingType:
 		embed = b.handlePing(s, i)
 	case cmdHelp:
 		embed = b.handleHelp(s, i)
+		privateResponse = false
 	case cmdConfigType: // All /config commands are delegated to the same function
 		embed = b.pc.HandleConfig(s, i) // Needs admin permissions
+		privateResponse = false
 	case cmdIsolate:
 		embed = b.handleIsolate(s, i) // Needs manage roles permissions
+		privateResponse = false
 	case cmdLogging:
 		embed = b.handleLogging(s, i) // Needs manage messages permissions
-		privateResponse = true
+	case cmdLoggingExt:
+		embed = b.handleLoggingExternal(s, i) // Needs manage messages permissions
 	case cmdRestore:
 		embed = b.handleRestore(s, i) // Needs manage roles permissions
+		privateResponse = false
 	default:
 		embed = utils.CreateNotAllowedEmbed("Unknown command", fmt.Sprintf("Unknown command: %v", n))
 	}
@@ -128,8 +133,8 @@ func (b *Bot) handleDMMessage(s *discordgo.Session, m *discordgo.MessageCreate) 
 	}
 
 	// if the message isn't from the dev channel, send it to the dev channel
-	if channel.ID != utils.DevChannelId {
-		_, err = s.ChannelMessageSend(utils.DevChannelId, fmt.Sprintf("Message from %v (`%v`): %v", m.Author.Username, m.Author.ID, m.Content))
+	if channel.ID != utils.GetDevChannel(s) {
+		_, err = s.ChannelMessageSend(utils.GetDevChannel(s), fmt.Sprintf("Message from %v (`%v`): %v", m.Author.Username, m.Author.ID, m.Content))
 		if err != nil {
 			log.Printf("Error sending message to dev channel: %v", err)
 			err = nil
@@ -139,6 +144,7 @@ func (b *Bot) handleDMMessage(s *discordgo.Session, m *discordgo.MessageCreate) 
 
 	// Check if the message is "refresh"
 	if strings.ToLower(m.Content) == "refresh" {
+		log.Printf("Refreshing commands")
 		err := b.RefreshCommands()
 		if err != nil {
 			log.Printf("Error refreshing commands: %v", err)

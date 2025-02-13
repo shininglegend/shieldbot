@@ -30,6 +30,14 @@ func SafeRoleName(role *discordgo.Role) string {
 	return strings.ReplaceAll(role.Name, "@", "@\u200B")
 }
 
+// SafeUser returns a User consistently
+func SafeUser(interaction *discordgo.Interaction) *discordgo.User {
+	if interaction.Member != nil {
+		return interaction.Member.User
+	}
+	return interaction.User
+}
+
 // Checks an error message for a specific discord error code
 func CheckError(err error, checkCode int) bool {
 	e, ok := err.(*discordgo.RESTError)
@@ -48,7 +56,7 @@ func CreateEmbed(title, description string) *discordgo.MessageEmbed {
 // CreateErrorEmbed i *discordgo.InteractionCreate, creates an embed with an error message, and dms the developer
 func CreateErrorEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, desc string, err error) *discordgo.MessageEmbed {
 	// Send a message to the developer with a link to the message, the user, and the error
-	SendToDevChannelDMs(s, fmt.Sprintf("Error: `%v`\nUser: %v | Channel: %v", err, i.Member.User.ID, i.ChannelID), 2)
+	SendToDevChannelDMs(s, fmt.Sprintf("Error: `%v`\nUser: %v | Channel: %v", err, SafeUser(i.Interaction).ID, i.ChannelID), 2)
 	return &discordgo.MessageEmbed{
 		Title:       "Error",
 		Description: desc,

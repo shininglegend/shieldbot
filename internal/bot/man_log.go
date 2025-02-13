@@ -25,25 +25,47 @@ func (b *Bot) handleLogging(s *discordgo.Session, i *discordgo.InteractionCreate
 	action := i.ApplicationCommandData().Options[1].StringValue()
 
 	// Log the action
-	b.logAction(s, i, user, action)
+	errEmd := b.logAction(s, i, user, action)
+	if errEmd != nil {
+		return errEmd
+	}
 
 	// Return the response
 	return utils.CreateEmbed("Logged action", fmt.Sprintf("Logged action for %v: %v", user.Mention(), action))
 }
 
-func (b *Bot) logAction(s *discordgo.Session, i *discordgo.InteractionCreate, user *discordgo.User, action string) {
+func (b *Bot) handleLoggingExternal(s *discordgo.Session, i *discordgo.InteractionCreate) *discordgo.MessageEmbed {
+	// Get the user and action from the interaction
+	user, err := s.User(i.ApplicationCommandData().Options[0].StringValue())
+	if user == nil || err != nil {
+		embed := utils.CreateEmbed("Error", err.Error())
+		embed.Color = 0xFF0000 // Red
+		embed.Timestamp = time.Now().Format(time.RFC3339)
+		return embed
+	}
+	action := i.ApplicationCommandData().Options[1].StringValue()
+
+	// Log the action
+	errEmd := b.logAction(s, i, user, action)
+	if errEmd != nil {
+		return errEmd
+	}
+
+	// Return the response
+	return utils.CreateEmbed("Logged action", fmt.Sprintf("Logged action for %v: %v", user.Mention(), action))
+}
+
+func (b *Bot) logAction(s *discordgo.Session, i *discordgo.InteractionCreate, user *discordgo.User, action string) *discordgo.MessageEmbed {
 	// Get the guild
 	guild, err := s.Guild(i.GuildID)
 	if err != nil {
-		utils.CreateErrorEmbed(s, i, "Error getting guild", err)
-		return
+		return utils.CreateErrorEmbed(s, i, "Error getting guild", err)
 	}
 
 	// Get the mod log channel
 	modLogChannelID, err := b.pm.GetLogChannelID(guild.ID)
 	if err != nil {
-		utils.CreateErrorEmbed(s, i, "Error getting mod log channel", err)
-		return
+		return utils.CreateErrorEmbed(s, i, "Error getting mod log channel", err)
 	}
 
 	// Set color based on action
@@ -65,8 +87,7 @@ func (b *Bot) logAction(s *discordgo.Session, i *discordgo.InteractionCreate, us
 		color = 0x0000FF // Blue
 	default:
 		// Invalid action
-		utils.CreateErrorEmbed(s, i, "Invalid action", fmt.Errorf("invalid action: %v", action))
-		return
+		return utils.CreateErrorEmbed(s, i, "Invalid action", fmt.Errorf("invalid action: %v", action))
 	}
 	// Set the default reason
 	reason := "*Reason not provided, and should be included below.*" // Default reason
@@ -103,7 +124,7 @@ func (b *Bot) logAction(s *discordgo.Session, i *discordgo.InteractionCreate, us
 		Embed:   embed,
 	})
 	if err != nil {
-		utils.CreateErrorEmbed(s, i, "Error sending mod log message", err)
-		return
+		return utils.CreateErrorEmbed(s, i, "Error sending mod log message", err)
 	}
+	return nil
 }
